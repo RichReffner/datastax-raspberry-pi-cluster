@@ -1,0 +1,241 @@
+Pi Cluster Setup Notes
+
+Hardware required for each DSE node:
+Raspberry Pi 2
+SanDisk 32GB Ultra SD card
+TP-LINK TL-WN725N wireless adapter
+power supply connecting cable
+
+power supply for Pi's
+1 wireless network router for the entire cluster
+network cable pi to hub connection before you install the wireless adapter
+
+^ all components of the cluster can be ordered on Amazon
+
+Note: These notes apply to the following versions 
+- Mac OS X 10.9.5
+- DSE 4.7.0
+- upgrade DSE 4.7.0 to 4.8.0
+
+~~~
+SD card imaging
+
+for managing flash images from Pi: ApplePi-Baker.app
+copy image to SanDisk card from Pi Baker failed
+
+card imaging using Mac OS
+https://www.raspberrypi.org/documentation/installation/installing-images/mac.md
+diskutil list
+SD card location: list your card mount location here. mine was: /dev/disk2
+image location: /Users/richreffner/Documents/Software/Pi/Pi_images/image_20150414_DSE4-6-2.img
+diskutil unmountDisk /dev/disk2
+
+dd takes a long time on standard parameters
+set buffer size to 1M and dd to rdisk instead of disk
+sudo dd bs=1m if=/Users/richreffner/Documents/Software/Pi/Pi_images/image_20150414_DSE4-6-2.img of=/dev/rdisk2
+check rdisk progress with ctrl-t
+14992+0 records in
+14992+0 records out
+15720251392 bytes transferred in 1276.850825 secs (12311737 bytes/sec)
+reference:
+http://stackoverflow.com/questions/6161823/dd-how-to-calculate-optimal-blocksize
+https://www.raspberrypi.org/forums/viewtopic.php?f=66&t=21995
+https://smittytone.wordpress.com/2013/09/06/back-up-a-raspberry-pi-sd-card-using-a-mac/
+
+~~~
+Pi connectivity
+I chose to use TP-Link router disconnected from internet for Pi cluster demos
+set up router and assign IPs to Pi's to prevent demo room shenanigans
+
+host name       MAC Address
+raspberrypi1	list the MAC addresses here for future reference
+raspberrypi2	
+raspberrypi3	
+raspberrypi4	
+raspberrypi5	
+raspberrypi6	
+
+after imaging the card then install card, power up Pi, and hardwire connect hub to Pi
+
+connecting via SSH
+ssh pi@<IP>
+password = raspberry
+
+~~~
+pi OS setup: 
+sudo raspi-config
+1 expand existing file system
+8 advanced options
+A2 host name - to give each image its own unique host name
+likely will need to reload the network settings and/or restart a few times before wireless adapter binds with new host name
+sudo service networking reload
+
+~~~
+Installing Java
+check java version: java -version
+cd /usr/lib
+permissions open for anything in JVM dir: sudo chmod 777 jvm
+cd jvm
+download correct java using ARM version:
+curl -b oraclelicense=accept-securebackup-cookie -O -L 'http://download.oracle.com/otn-pub/java/jdk/7u60-b19/jdk-7u60-linux-arm-vfp-hflt.tar.gz'
+tar -zxvf jdk-7u60-linux-arm-vfp-hflt.tar.gz
+from: http://www.datastax.com/documentation/cassandra/2.0/cassandra/install/installJreDeb.html
+sudo update-alternatives --install "/usr/bin/java" "java" "/usr/lib/jvm/jdk1.7.0_60/bin/java" 1
+sudo update-alternatives --set java /usr/lib/jvm/jdk1.7.0_60/bin/java
+
+~~~
+install JNA
+sudo apt-get install libjna-java
+
+~~~
+installing DSE
+download DSE
+curl --user rreffner_datastax.com:m9mM4ub5zz1LKc2 -L http://downloads.datastax.com/enterprise/dse.tar.gz | tar xz
+
+sudo mkdir -p /var/lib/cassandra; sudo chown -R  $USER: $GROUP /var/lib/cassandra
+sudo mkdir -p /var/log/cassandra; sudo chown -R  $USER: $GROUP /var/log/cassandra
+sudo mkdir -p /var/lib/spark; sudo chown -R  $USER: $GROUP /var/lib/spark
+sudo mkdir -p /var/log/spark; sudo chown -R  $USER: $GROUP /var/log/spark
+
+DSE home directory: /home/pi/dse-4.6.2
+DSE is ready to run in single node config
+
+~~~
+Installing wireless adapters
+
+insert wireless adapter into USB
+sudo reboot
+http://raspberrypihq.com/how-to-add-wifi-to-the-raspberry-pi/
+http://www.howtogeek.com/167425/how-to-setup-wi-fi-on-your-raspberry-pi-via-the-command-line/
+
+dmesg > dmesg_out
+vi dmesg_out
+/Realtek     <== this will find the line that shows the wifi adapter was found during boot up
+
+installing the TP-LINK TL-WN725N V2 driver
+https://www.raspberrypi.org/forums/viewtopic.php?t=62371
+uname -v or uname -a to find the kernel version
+8188eu-v7-20150212.tar.gz for kernel #755
+wget https://dl.dropboxusercontent.com/u/80256631/8188eu-v7-20150212.tar.gz
+tar xzf 8188eu-v7-20150212.tar.gz
+./install.sh
+
+pi wlan network config
+cd ./etc/wpa_supplicant
+vi wpa_supplicant.conf
+
+make changes for your network router security setup as needed
+
+sudo service networking reload
+ifconfig
+at this point you should be able to see the Pi on wireless connection
+
+references:
+https://wiki.netbsd.org/tutorials/how_to_use_wpa_supplicant/
+https://wiki.gentoo.org/wiki/Wpa_supplicant
+http://linux.die.net/man/5/wpa_supplicant.conf
+
+~~~
+start DSE agents - see DataStax docs
+
+~~~
+install OpsCenter
+
+OpsCenter could not connect to cluster
+no cluster_conf exists by default in OpsCenter
+
+cassandra.yaml 
+cluster_name: 'YOUR CLUSTER NAME HERE'
+broadcast address
+listen address - could not get nodes to start without this blank when auto-bootstrap:true
+seeds
+auto-bootstrap
+
+http://docs.datastax.com/en/opscenter/5.1//opsc/configure/agentAddressConfiguration.html
+http://docs.datastax.com/en/opscenter/5.1/opsc/examples/opscConfiguringForMultipleRegions_t.html
+
+cluster IPs
+list your cluster IPs here as needed for reference
+
+get IPs
+ifconfig |grep -B1 "inet addr" |awk '{ if ( $1 == "inet" ) { print $2 } else if ( $2 == "Link" ) { printf "%s:" ,$1 } }' |awk -F: '{ print $1 ": " $3 }'
+local loopback IP on each node 127.0.0.1
+
+check open ports
+netstat -ap tcp
+
+opening ports
+sudo ufw allow 8888
+sudo ufw allow 7000
+sudo ufw allow 7001
+sudo ufw allow 7199
+sudo ufw allow 9042
+sudo ufw allow 9160
+sudo ufw allow 61620
+sudo ufw allow 61621
+https://help.ubuntu.com/community/UFW
+
+~~~~~
+OpsCenter troubleshooting
+
+OpsCenter didn't see existing cluster first
+OpsCenter failed to install new cluster <== OC can't install on Raspbian OS
+
+manual C* config for OpsCenter
+[1] newly installed empty nodes required the following to successfully start C*
+	auto-bootstrap: yes
+	listen address = null
+	seeds had to be pointing to self
+[2] after initial C* start, then 
+	shut C* down on all nodes
+	added listen address as node IP
+	populated seeds properly (as 1 in each DC)
+	removed auto-bootstrap
+[3] then
+	everything worked in the cluster
+	OpsCenter could see the cluster
+
+downloading agents
+curl -L http://downloads.datastax.com/community/datastax-agent-5.1.2.tar.gz | tar xz
+
+~~~
+DSE 4.7 upgrade notes
+
+cp cassandra.yaml cassandra.yaml.bak
+
+curl --user rreffner_datastax.com:m9mM4ub5zz1LKc2 -L http://downloads.datastax.com/enterprise/dse.tar.gz | tar xz
+
+backup your old YAML files and any other config files of interest (see upgrade docs)
+
+manually make changes to new cassandra.yaml by walking through the old cassandra.yaml
+non-obvious changes for this particular version upgrade were:
+auto-snapshot: false
+concurrent_compactors: 2
+# stream_throughput_outbound_megabits_per_sec:
+# inter_dc_stream_throughput_outbound_megabits_per_sec:
+
+set up Gossiping Property File Snitch by copying old cassandra-rackdc.properties file to new conf directory
+
+~~~
+OPsCenter Agent upgrade
+
+curl -L http://downloads.datastax.com/community/datastax-agent-5.1.2.tar.gz | tar xz
+
+copy config files
+cp ~/dse-4.6.2/datastax-agent/conf/* ~/dse-4.7.0/datastax-agent-5.1.2/conf/
+
+agents are picking up 127.0.0.1 as cassandra listen address
+solve: bug in agents. Fix is to populate ONLY the stomp interface in the address.yaml on the pi nodes
+
+'Test Cluster' was the name of both local and pi clusters
+- need to resolve this by manually changing the name of laptop cluster to Local Cluster
+- http://stackoverflow.com/questions/22006887/cassandra-saved-cluster-name-test-cluster-configured-name
+- changed name of local cluster and pi agents still not seeing C*
+
+decided to store OpsCenter data in the pi cluster but run OpsCenter client on laptop due to agent incoming_interface config issues and the fact that I would want to run my local node without the pi network connected
+- might need to back out on this to set the agent interface after all 
+- this would likely mean need to change out OpsCenter config files when using it against local node only (to point to 127.0.0.1)
+- need to run C* standalone using a different YAML file with 127.0.0.1 local IP
+
+opscenterd.conf changes 
+interface=192.168.0.107   # this will only work when the pi router is connected to laptop (obviously)	
