@@ -1,18 +1,19 @@
 Pi Cluster Setup Notes
 
 Hardware required for each DSE node:
-Raspberry Pi 2
-SanDisk 32GB Ultra SD card
-TP-LINK TL-WN725N wireless adapter
-power supply connecting cable
+1 Raspberry Pi 2
+1 SanDisk 32GB Ultra SD card
+1 TP-LINK TL-WN725N wireless adapter
+1 power supply connecting cable
 
-power supply for Pi's
-1 wireless network router for the entire cluster
-network cable pi to hub connection before you install the wireless adapter
+For the entire cluster:
+1+ power supplies (enough plugs for all Pi's)
+1 wireless network router
+1 network cable for pi to hub connection before you install the wireless adapter
 
 ^ all components of the cluster can be ordered on Amazon
 
-Note: These notes apply to the following versions 
+Note: The notes below apply to the following versions 
 - Mac OS X 10.9.5
 - DSE 4.7.0
 - upgrade DSE 4.7.0 to 4.8.0
@@ -20,8 +21,8 @@ Note: These notes apply to the following versions
 ~~~
 SD card imaging
 
-for managing flash images from Pi: ApplePi-Baker.app
-copy image to SanDisk card from Pi Baker failed
+for managing flash images: ApplePi-Baker.app
+- copy image to SanDisk card from Pi Baker failed
 
 card imaging using Mac OS
 https://www.raspberrypi.org/documentation/installation/installing-images/mac.md
